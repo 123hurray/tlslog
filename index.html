@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Tlslog by 123hurray</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Tlslog</h1>
+        <h2>TLSLog is a golang library which stores SSL/TLS (Key-Exchange method must be ECDHE) master key and client random in NSS key log format that can be used for aplication data decryption using Wireshark</h2>
+        <a href="https://github.com/123hurray/tlslog" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
+<a id="tlslog" class="anchor" href="#tlslog" aria-hidden="true"><span class="octicon octicon-link"></span></a>TLSLog</h1>
+
+<p><a href="https://raw.githubusercontent.com/123hurray/tlslog/master/LICENSE"><img src="http://img.shields.io/badge/license-MIT-red.svg?style=flat" alt="license"></a></p>
+
+<h2>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction</h2>
+
+<p>TLSLog is a Golang library used to debug SSL application data for Wireshark.</p>
+
+<p>If ECDHE is used in Key-Exchange, Wireshark cannot decrypt the application data only by set the server private key.
+But Wireshark supports <a href="https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format">NSS key log format</a> that store all information
+needed in application data decryption process.</p>
+
+<p>NSS key log format is supported by Chrome and Firefox but not Golang.
+When using Golang <code>crypto/tls</code> library, it's difficult to debug encrypted data sent and received by SSL.</p>
+
+<p>But Golang <code>crypto/tls</code> library does store these information internally.
+Thus, TLSLog hooks <code>config.Rand</code> and uses reflection to get master secret from <code>crypto/tls</code> library.</p>
+
+<p><strong>CAUTION：Only client side function is implemented, which means that TLSLog can not be used to build a SSL server.</strong></p>
+
+<h2>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<h3>
+<a id="install" class="anchor" href="#install" aria-hidden="true"><span class="octicon octicon-link"></span></a>Install</h3>
+
+<div class="highlight highlight-source-shell"><pre>go get github.com/123hurray/tlslog/tlslog.go</pre></div>
+
+<h3>
+<a id="dial" class="anchor" href="#dial" aria-hidden="true"><span class="octicon octicon-link"></span></a>Dial</h3>
+
+<p><code>Dial</code> is the most commonly way to build an SSL client.</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-smi">config</span> <span class="pl-k">:=</span> tls.<span class="pl-smi">Config</span>{InsecureSkipVerify: <span class="pl-c1">true</span>}
+
+<span class="pl-c">// Get a TLSLog</span>
+<span class="pl-smi">tlsLog</span>, <span class="pl-smi">err</span> <span class="pl-k">:=</span> <span class="pl-c1">NewTLSLog</span>(<span class="pl-s"><span class="pl-pds">"</span>log.txt<span class="pl-pds">"</span></span>)
+<span class="pl-k">if</span> err != <span class="pl-c1">nil</span> {
+    fmt.<span class="pl-c1">Println</span>(<span class="pl-s"><span class="pl-pds">"</span>Unable to create TlsLog:<span class="pl-pds">"</span></span>, err.<span class="pl-c1">Error</span>())
+}
+
+<span class="pl-c">// Use TLSLog.Dial instead of tls.Dial</span>
+<span class="pl-smi">conn</span>, <span class="pl-smi">err</span> <span class="pl-k">:=</span> tlsLog.<span class="pl-c1">Dial</span>(<span class="pl-s"><span class="pl-pds">"</span>tcp<span class="pl-pds">"</span></span>, <span class="pl-s"><span class="pl-pds">"</span>127.0.0.1:32123<span class="pl-pds">"</span></span>, &amp;config)
+
+<span class="pl-c">// conn is tls.Conn, just used as is documented in tls library</span></pre></div>
+
+<h3>
+<a id="client" class="anchor" href="#client" aria-hidden="true"><span class="octicon octicon-link"></span></a>Client</h3>
+
+<p><code>Client</code> is another way to build an SSL client.</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-smi">config</span> <span class="pl-k">:=</span> tls.<span class="pl-smi">Config</span>{InsecureSkipVerify: <span class="pl-c1">true</span>}
+<span class="pl-smi">tlsLog</span>, <span class="pl-smi">err</span> <span class="pl-k">:=</span> <span class="pl-c1">NewTLSLog</span>(<span class="pl-s"><span class="pl-pds">"</span>log.txt<span class="pl-pds">"</span></span>)
+<span class="pl-c">// Make net.conn</span>
+<span class="pl-smi">c</span>, <span class="pl-smi">s</span> <span class="pl-k">:=</span> net.<span class="pl-c1">Pipe</span>()
+<span class="pl-c">// use TLSLog.Client instead of tls.Client</span>
+<span class="pl-smi">logCli</span> <span class="pl-k">:=</span> tlsLog.<span class="pl-c1">Client</span>(c, &amp;config)
+<span class="pl-c">// Do handshake</span>
+conn, err = logCli.<span class="pl-c1">Handshake</span>()
+<span class="pl-c">// conn is tls.Conn, just used as is documented in tls library</span></pre></div>
+
+<h2>
+<a id="decrypt-application-data-using-wireshark" class="anchor" href="#decrypt-application-data-using-wireshark" aria-hidden="true"><span class="octicon octicon-link"></span></a>Decrypt application data using Wireshark</h2>
+
+<p>See the articles below:</p>
+
+<ul>
+<li><a href="https://wiki.wireshark.org/SSL#Using_the_.28Pre.29-Master-Secret">Wireshark WIKI:Using the (Pre)-Master-Secret</a></li>
+<li><a href="https://jimshaver.net/2015/02/11/decrypting-tls-browser-traffic-with-wireshark-the-easy-way/">Decrypting TLS Browser Traffic With Wireshark – The Easy Way!</a></li>
+</ul>
+
+<h2>
+<a id="todo" class="anchor" href="#todo" aria-hidden="true"><span class="octicon octicon-link"></span></a>TODO</h2>
+
+<ul>
+<li>Server side key log</li>
+</ul>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/123hurray/tlslog/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/123hurray/tlslog/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/123hurray/tlslog"></a> is maintained by <a href="https://github.com/123hurray">123hurray</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
